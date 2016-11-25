@@ -18,11 +18,12 @@
             var defaults = 
             {
                 meta: [
-                    ['description','name',     'description'],
+                    ['description','name', 'description'],
                     ['description','property', 'og:description'],
                     ['description','property', 'pinterestapp:about'],
                     ['image','property', 'og:image'],
                     ['image','itemprop', 'image'],
+                    ['title','name', 'title'],
                     ['title','property', 'og:title'],
                     ['video','property', 'og:video'],
                     ['video_type','property', 'og:video:type'],
@@ -105,7 +106,7 @@
                                        core.getPreview({}, strUrl);
                                        
                                    } else {
-                                       core.getData(strUrl);  
+                                       core.getData(strUrl, 'opengraphio');  
                                    }
                                    
                                    return true;
@@ -166,40 +167,55 @@
                     return duplicate;
                 };
                 
-                core.getData = function (url)
+                core.getData = function (url, apiType)
                 {
-                  
-                    var xpath  =  '//head|//body';
-                    var query  =  'select * from html where url="' + url + '" and compat="html5" and xpath="'+xpath+'"';
-
+                    apiType = (!apiType) ? 'yql' : apiType;
+                    console.log(apiType);
+                    
                     core.addLoader();
                     
-                    $.yql(query, function() 
-                        {
-                            var data = {
-                                query : {results: null}
+                    if(apiType == 'yql'){
+                        var xpath  =  '//head|//body';
+                        var query  =  'select * from html where url="' + url + '" and compat="html5" and xpath="'+xpath+'"';
+                        
+                        $.yql(query, function() 
+                            {
+                                var data = {
+                                    query : {results: null}
+                                }
+
+                                core.ajaxSuccess(data, url);
+                                core.removeLoader();
+                                return false;  
+                            },
+                            function(data) 
+                            {
+                                core.ajaxSuccess(data, url)
                             }
-                            
-                            core.ajaxSuccess(data, url);
-                            core.removeLoader();
-                            return false;  
-                        },
-                        function(data) 
-                        {
-                            core.ajaxSuccess(data, url)
-                        }
-                    )
+                        )
+                    }
+                    
+                    if(apiType == 'opengraphio'){
+                        $.ajax({
+                            url: 'https://opengraph.io/api/1.0/site/' + encodeURIComponent(url),
+                            success: function(data){
+                                core.getPreviewFromOpengraphio(data, url);
+                            }, error: function(data){
+                                console.log('error');
+                            }
+                        })
+                    }
+
                 }; //getData
                 
-                core.ajaxSuccess = function(data, url)
-                {
+                core.ajaxSuccess = function(data, url, apiType)
+                {   
                     // URL already loaded, or preview is already shown.
                     if (core.isDuplicate(url, core.already) || core.preview) {
                         core.removeLoader();
                         return false;  
                     }
-
-
+                    
                     if ($(data).find("results").text().length == 0) {
 
                         if (o.matchNoData) {
@@ -219,16 +235,51 @@
                     return (preview[section].length == 0) ? false : true;  
                 };
                 
+                core.getPreviewFromOpengraphio = function(data, uri){
+                    console.log('veio');
+                    core.preview = true;
+                    core.already.push(uri);
+                    
+                    preview.title       = data.hybridGraph.title;
+                    preview.url         = uri;
+                    preview.description = data.hybridGraph.description;
+                    preview.image       = data.hybridGraph.image;
+                    
+                    core.removeLoader();
+                    
+                    // prepare output
+                    var not   = 'undefined';
+                    var data  = {
+                        title       : preview.title,
+                        description : preview.description,
+                        url         : preview.url,
+                        video       : (typeof preview.video != not && preview.video.length > 0) ? {} : null
+                    };
+                    
+                    o.success(data);
+                    
+                    if (core.hasValue('image')){
+                        preview.images.push(preview.image); 
+                        preview.image = '';
+                    }
+                    
+                    core.addImages();
+                    core.current.one('clear', function() 
+                    {
+                       core.init();
+                    });
+                };
+                
                 core.getPreview = function(data, uri)
                 {
                     core.preview = true; 
-                    core.already.push(uri);  
+                    core.already.push(uri);
 
                     var title  = "" ;
                     
                     $(data, '<head>').find('title').each(function() 
                     {
-                        title = $(this).text();
+                            title = $(this).text();
                     }); 
                     
                   
@@ -434,23 +485,23 @@
     jQuery.yql = function yql(query, error, success) 
     {
         var yql = {
-            path: 'http://query.yahooapis.com/v1/public/yql?q=',
+            path: 'https://query.yahooapis.com/v1/public/yql?q=',
             query: encodeURIComponent(query)
         };
         
-        var isIE = /msie/.test(navigator.userAgent.toLowerCase());
+//        var isIE = /msie/.test(navigator.userAgent.toLowerCase());
         
-        if (isIE && window.XDomainRequest) {
-            var xdr = new XDomainRequest();
-            xdr.open("get", yql['path'] + yql['query']);
-            xdr.onload = function() 
-            {
-                success(xdr.responseText);
-            };
-            
-            xdr.send();
-         
-        } else {
+//        if (isIE && window.XDomainRequest) {
+//            var xdr = new XDomainRequest();
+//            xdr.open("get", yql['path'] + yql['query']);
+//            xdr.onload = function() 
+//            {
+//                success(xdr.responseText);
+//            };
+//            
+//            xdr.send();
+//         
+//        } else {
 
             $.ajax({
                 crossDomain : true,
@@ -462,7 +513,7 @@
                 error    : error,
                 success  : success
             });   
-        }
+//        }
     };
     
     jQuery.urlHelper =
