@@ -38,6 +38,7 @@
                minWidth         : 100,
                minHeight        : 32,
                logoWord         : 'logo',
+               adapter         : 'opengraphio',
                success          : function() {},
                loadStart        : function() {},
                loadEnd          : function() {},
@@ -106,7 +107,7 @@
                                        core.getPreview({}, strUrl);
                                        
                                    } else {
-                                       core.getData(strUrl, 'opengraphio');  
+                                       core.getData(strUrl, options.adapter);
                                    }
                                    
                                    return true;
@@ -170,8 +171,7 @@
                 core.getData = function (url, apiType)
                 {
                     apiType = (!apiType) ? 'yql' : apiType;
-                    console.log(apiType);
-                    
+
                     core.addLoader();
                     
                     if(apiType == 'yql'){
@@ -236,7 +236,6 @@
                 };
                 
                 core.getPreviewFromOpengraphio = function(data, uri){
-                    console.log('veio');
                     core.preview = true;
                     core.already.push(uri);
                     
